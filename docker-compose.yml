@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: postgres:16
+    env_file: .env
+    ports: ["${POSTGRES_PORT}:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7
+    ports: ["${REDIS_PORT}:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+  chroma:
+    image: chromadb/chroma:latest
+    ports: ["${CHROMA_PORT}:8000"]
+    volumes: ["chroma_data:/data"]
+volumes:
+  pgdata:
+  chroma_data:

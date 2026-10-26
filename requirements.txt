@@ -1,0 +1,6 @@
+requests
+python-dotenv
+pytest
+psycopg[binary]
+chromadb-client
+langgraph
