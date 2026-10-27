@@ -11,3 +11,4 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3.5:4b")
 RAG_API_URL = os.getenv("RAG_API_URL", "http://127.0.0.1:8000")
 WORKSPACE = ROOT / "workspace"
 REFUSAL_TEXT = "I don't know based on the documentation."
+RAG_API_KEY = os.getenv("RAG_API_KEY", "")
