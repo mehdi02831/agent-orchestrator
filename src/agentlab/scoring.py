@@ -58,7 +58,15 @@ def score_task(task, result):
             refuse_failure = "rag_answered"
     return {"id": task["id"], "category": task["category"], "split": task["split"],
             "expected": exp["outcome"], "escalated": escalated, "tools_ok": tools_ok,
-            "refusal_near_miss": near_miss, "refuse_failure": refuse_failure, "success": bool(ok)}
+            "refusal_near_miss": near_miss, "refuse_failure": refuse_failure,
+            "reason_type": result.get("reason_type", ""), "expected_reason": exp.get("reason", ""),
+            "invalid_plans": result.get("invalid_plans", 0), "guard_fired": result.get("guard_fired", ""),
+            "success": bool(ok)}
+
+
+def _model_reason(s):
+    return bool(s["escalated"] and s["expected"] == "escalate" and s.get("reason_type")
+                and not s.get("guard_fired"))
 
 
 def _stats(xs):
@@ -92,6 +100,11 @@ def summarize(rows):
         "max_prompt_tokens": max((r["max_prompt_tokens"] for r in timed), default=0),
         "near_miss_refusals": sum(1 for s in sc if s["refusal_near_miss"]),
         "refuse_failures": rf,
+        "plan": {"tasks_with_invalid": sum(1 for s in sc if s.get("invalid_plans", 0) > 0),
+                 "invalid_total": sum(s.get("invalid_plans", 0) for s in sc),
+                 "errors": sum(1 for r in rows if r["result"]["outcome"] == "error"), "n": len(sc)},
+        "reason": (sum(1 for s in sc if _model_reason(s) and s["reason_type"] == s.get("expected_reason")),
+                   sum(1 for s in sc if _model_reason(s))),
         "outcomes": {o: sum(1 for r in rows if r["result"]["outcome"] == o)
                      for o in sorted({r["result"]["outcome"] for r in rows})},
     }
@@ -119,6 +132,8 @@ def format_summary(s):
         f"Max prompt tokens:    {s['max_prompt_tokens']} (Ollama context seen: 4096)",
         f"Near-miss refusals:   {s['near_miss_refusals']} (contain the refusal text but not exact)",
         f"Refuse failures:      {s['refuse_failures'] or 'none'}",
+        f"Tasks w/ invalid plan: {_fmt(s['plan']['tasks_with_invalid'], s['plan']['n'])} ({s['plan']['invalid_total']} invalid replies, {s['plan']['errors']} error outcomes)",
+        f"Reason-type accuracy: {_fmt(*s['reason'])} (model-assigned escalations only)",
         f"Run outcomes:         {s['outcomes']}",
     ]
     return "\n".join(lines)

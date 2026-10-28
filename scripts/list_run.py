@@ -1,7 +1,7 @@
 import json, sys
 from pathlib import Path
 RES = Path(__file__).resolve().parents[1] / "eval" / "results"
-p = Path(sys.argv[1]) if len(sys.argv) > 1 else max(RES.glob("single_dev_*.jsonl"), key=lambda x: x.stat().st_mtime)
+p = Path(sys.argv[1]) if len(sys.argv) > 1 else max(RES.glob("*_dev_*.jsonl"), key=lambda x: x.stat().st_mtime)
 print(p.name)
 for line in p.read_text(encoding="utf-8").splitlines():
     row = json.loads(line)

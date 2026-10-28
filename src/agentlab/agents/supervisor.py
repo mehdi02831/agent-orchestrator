@@ -43,7 +43,7 @@ Rules:
 1. Any general-knowledge or Django question MUST be delegated to rag first. Never answer such a question from memory.
 2. If rag returned "__REFUSAL__", finish with exactly that sentence. Add nothing: no apology, no other source, no guess.
 3. Arithmetic and file reading go to data. Split multi-part requests: one delegation per part, then finish with a combined answer.
-4. Escalate instead of finishing when: the request is to delete, overwrite, move or write a file (no specialist can); the request is too vague to act on; or a specialist reported a tool error twice.
+4. Escalate instead of finishing, with the matching reason_type: risky_action when the request is to delete, overwrite, move or write a file (no specialist can); low_confidence when the request is too vague to act on; tool_failure when a specialist reported a tool error twice.
 5. Delegated tasks must be self-contained: include file paths and numbers."""
 SUPERVISOR_PROMPT = SUPERVISOR_PROMPT.replace("__REFUSAL__", config.REFUSAL_TEXT)
 

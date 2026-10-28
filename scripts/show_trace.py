@@ -14,7 +14,7 @@ ap.add_argument("ids", nargs="+")
 ap.add_argument("--file")
 args = ap.parse_args()
 
-path = Path(args.file) if args.file else max(RES.glob("single_dev_*.jsonl"), key=lambda p: p.stat().st_mtime)
+path = Path(args.file) if args.file else max(RES.glob("*_dev_*.jsonl"), key=lambda p: p.stat().st_mtime)
 print("file:", path.name)
 for line in path.read_text(encoding="utf-8").splitlines():
     row = json.loads(line)

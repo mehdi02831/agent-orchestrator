@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from agentlab import config
 from agentlab.agents.single import PROMPTS, RunResult, run_single
+from agentlab.agents.supervisor import run_supervisor
 from agentlab.llm.factory import get_provider
 from agentlab.scoring import format_summary, score_task, summarize
 from agentlab.tools.base import ToolConfigError
@@ -30,6 +31,7 @@ def ascii_safe(s):
 ap = argparse.ArgumentParser()
 ap.add_argument("--split", choices=["dev", "test", "all"], default="dev")
 ap.add_argument("--ids", nargs="+")
+ap.add_argument("--agent", choices=["single", "supervisor"], default="single")
 ap.add_argument("--prompt", choices=sorted(PROMPTS), default="v1")
 ap.add_argument("--guards", nargs="*", choices=["gate", "relay", "failures"], default=[])
 ap.add_argument("--final", action="store_true", help="required to touch the frozen test split")
@@ -49,15 +51,16 @@ if not tasks:
 
 provider = get_provider()
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-out_path = ROOT / "eval" / "results" / f"single_{args.split}_{ts}.jsonl"
-meta = {"meta": {"agent": "single", "model": config.OLLAMA_MODEL, "git": git_rev(),
-                 "split": args.split, "prompt": args.prompt, "guards": sorted(args.guards), "time": ts, "n_tasks": len(tasks)}}
+out_path = ROOT / "eval" / "results" / f"{args.agent}_{args.split}_{ts}.jsonl"
+meta = {"meta": {"agent": args.agent, "model": config.OLLAMA_MODEL, "git": git_rev(),
+                 "split": args.split, "prompt": args.prompt if args.agent == "single" else "supervisor-v1", "guards": sorted(args.guards), "time": ts, "n_tasks": len(tasks)}}
 rows, consecutive_errors = [], 0
 with out_path.open("w", encoding="utf-8") as f:
     f.write(json.dumps(meta) + "\n")
     for t in tasks:
         try:
-            res = run_single(provider, t["prompt"], prompt_version=args.prompt, guards=frozenset(args.guards))
+            res = (run_supervisor(provider, t["prompt"], guards=frozenset(args.guards)) if args.agent == "supervisor"
+                   else run_single(provider, t["prompt"], prompt_version=args.prompt, guards=frozenset(args.guards)))
             consecutive_errors = 0
         except ToolConfigError as e:
             sys.exit(f"CONFIG ERROR, aborting the run: {e}")
@@ -84,4 +87,4 @@ for row_ in rows:
     if g_:
         fired[g_] = fired.get(g_, 0) + 1
 print("Guards enabled:      ", sorted(args.guards) or "none", "| fired:", fired or "none")
-print("\nPrompt:", args.prompt, "| Traces:", out_path)
+print("\nAgent:", args.agent, "| Prompt:", args.prompt if args.agent == "single" else "supervisor-v1", "| Traces:", out_path)

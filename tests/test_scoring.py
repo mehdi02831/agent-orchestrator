@@ -69,3 +69,22 @@ def test_refuse_failure_causes():
                                "content": '{"answer": "startapp", "sources": ["x"]}'}]
     assert score_task(REF, answered)["refuse_failure"] == "rag_answered"
     assert score_task(REF, _res(text=config.REFUSAL_TEXT))["refuse_failure"] is None
+
+
+def test_reason_accuracy_counts_model_choices_only():
+    def esc(reason_type, guard=""):
+        r = _res("escalate")
+        r["reason_type"], r["guard_fired"] = reason_type, guard
+        return _row(ESC, r)
+    rows = [esc("risky_action"), esc("low_confidence"), esc("risky_action", guard="gate"), _row(ESC, _res("escalate"))]
+    assert summarize(rows)["reason"] == (1, 2)
+
+
+def test_plan_metrics():
+    ok = _res("answer", "434", [("calculator", "ok")])
+    bad = _res("answer", "434", [("calculator", "ok")])
+    bad["invalid_plans"] = 2
+    err = _res("error")
+    err["invalid_plans"] = 3
+    p = summarize([_row(CALC, ok), _row(CALC, bad), _row(CALC, err)])["plan"]
+    assert p == {"tasks_with_invalid": 2, "invalid_total": 5, "errors": 1, "n": 3}

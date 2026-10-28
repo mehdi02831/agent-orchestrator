@@ -17,7 +17,7 @@ def load(p):
 if len(sys.argv) == 3:
     pa, pb = Path(sys.argv[1]), Path(sys.argv[2])
 else:
-    files = sorted(RES.glob("single_dev_*.jsonl"), key=lambda p: p.stat().st_mtime)
+    files = sorted(RES.glob("*_dev_*.jsonl"), key=lambda p: p.stat().st_mtime)
     if len(files) < 2:
         sys.exit("Need at least two runs in eval/results")
     pa, pb = files[-2], files[-1]
