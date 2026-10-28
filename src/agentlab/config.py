@@ -14,3 +14,14 @@ REFUSAL_TEXT = "I don't know based on the documentation."
 RAG_API_KEY = os.getenv("RAG_API_KEY", "")
 FETCH_ALLOWED_HOSTS = {h.strip() for h in os.getenv("FETCH_ALLOWED_HOSTS", "docs.djangoproject.com").split(",") if h.strip()}
 MAX_TOOL_OUTPUT_CHARS = 4000
+
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+POSTGRES_USER = os.getenv("POSTGRES_USER", "agent")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
+POSTGRES_DB = os.getenv("POSTGRES_DB", "agentlab")
+
+
+def postgres_conn(dbname=None):
+    return {"host": POSTGRES_HOST, "port": POSTGRES_PORT, "user": POSTGRES_USER,
+            "password": POSTGRES_PASSWORD, "dbname": dbname or POSTGRES_DB, "connect_timeout": 5}
