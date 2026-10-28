@@ -25,3 +25,6 @@ POSTGRES_DB = os.getenv("POSTGRES_DB", "agentlab")
 def postgres_conn(dbname=None):
     return {"host": POSTGRES_HOST, "port": POSTGRES_PORT, "user": POSTGRES_USER,
             "password": POSTGRES_PASSWORD, "dbname": dbname or POSTGRES_DB, "connect_timeout": 5}
+
+CHROMA_HOST = os.getenv("CHROMA_HOST", "127.0.0.1")
+CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8001"))

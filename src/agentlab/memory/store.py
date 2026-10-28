@@ -54,6 +54,9 @@ class RunStore(ABC):
     @abstractmethod
     def list_runs(self, limit: int = 20) -> list[dict]: ...
 
+    @abstractmethod
+    def delete_run(self, run_id: int) -> bool: ...
+
 
 class PostgresRunStore(RunStore):
     def __init__(self, **conn_kwargs):
@@ -112,3 +115,8 @@ class PostgresRunStore(RunStore):
             return c.execute(
                 "SELECT id, created_at, agent, status, prompt FROM runs ORDER BY id DESC LIMIT %s",
                 (limit,)).fetchall()
+
+    def delete_run(self, run_id):
+        with self._connect() as c:
+            cur = c.execute("DELETE FROM runs WHERE id = %s", (run_id,))
+            return cur.rowcount > 0

@@ -3,4 +3,4 @@ python-dotenv
 pytest
 psycopg[binary]
 chromadb-client
-langgraph
+langgraphsentence-transformers

@@ -91,3 +91,13 @@ def test_unicode_kept_and_nul_stripped(store):
 def test_init_schema_is_idempotent(store):
     store.init_schema()
     store.init_schema()
+
+
+def test_delete_run_cascades(store):
+    rid = store.save_run(run_record("supervisor", "q", _sup()))
+    assert store.delete_run(rid) is True
+    assert store.get_run(rid) is None
+    assert store.delete_run(rid) is False
+    with psycopg.connect(**config.postgres_conn(TEST_DB)) as c:
+        n = c.execute("SELECT count(*) FROM run_tool_calls WHERE run_id = %s", (rid,)).fetchone()[0]
+    assert n == 0
