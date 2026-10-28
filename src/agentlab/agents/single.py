@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from .. import config
 from ..llm.base import LLMProvider
 from ..tools.registry import execute, tool_schemas
+from .guardrails import is_risky, refusal_relay, unrecovered_failure
 
 MAX_STEPS = 6
 
@@ -42,15 +43,22 @@ class RunResult:
     latency_s: float = 0.0
     max_prompt_tokens: int = 0
     error: str = ""
+    guard_fired: str = ""
 
 
 def run_single(provider: LLMProvider, prompt: str, max_steps: int = MAX_STEPS,
-               prompt_version: str = "v1") -> RunResult:
+               prompt_version: str = "v1", guards: frozenset = frozenset()) -> RunResult:
     """Single-agent ReAct loop (the control group). ToolConfigError is not caught here."""
     messages = [{"role": "system", "content": PROMPTS[prompt_version]}, {"role": "user", "content": prompt}]
     schemas = tool_schemas() + [ASK_HUMAN]
     res = RunResult(outcome="max_steps")
     t0 = time.perf_counter()
+    if "gate" in guards and is_risky(prompt):
+        reason = "guard: request to delete, overwrite or write files"
+        res.outcome, res.escalation_reason, res.guard_fired = "escalate", reason, "gate"
+        res.tool_calls.append({"name": "ask_human", "arguments": {"reason": reason}, "kind": "ok", "content": ""})
+        res.latency_s = time.perf_counter() - t0
+        return res
     for step in range(1, max_steps + 1):
         resp = provider.chat(messages, schemas)
         res.steps = step
@@ -72,5 +80,10 @@ def run_single(provider: LLMProvider, prompt: str, max_steps: int = MAX_STEPS,
             res.tool_calls.append({"name": c.name, "arguments": c.arguments,
                                    "kind": r.kind, "content": r.content[:300]})
             messages.append({"role": "tool", "tool_name": c.name, "content": r.content})
+    if res.outcome == "answer":
+        if "relay" in guards and refusal_relay(res.tool_calls) and res.final_text.strip() != config.REFUSAL_TEXT:
+            res.final_text, res.guard_fired = config.REFUSAL_TEXT, "relay"
+        elif "failures" in guards and unrecovered_failure(res.tool_calls):
+            res.outcome, res.escalation_reason, res.guard_fired = "escalate", "guard: tool failure not recovered", "failures"
     res.latency_s = time.perf_counter() - t0
     return res
