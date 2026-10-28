@@ -17,8 +17,10 @@ class LLMResponse:
 
 
 class LLMProvider(ABC):
-    """One swappable class. Messages use the OpenAI-style role/content dicts."""
+    """One swappable class. Messages use the OpenAI-style role/content dicts.
+    response_format: optional JSON schema that constrains the reply (not combined with tools)."""
 
     @abstractmethod
-    def chat(self, messages: list[dict], tools: list[dict] | None = None) -> LLMResponse:
+    def chat(self, messages: list[dict], tools: list[dict] | None = None,
+             response_format: dict | None = None) -> LLMResponse:
         ...
