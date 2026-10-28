@@ -9,7 +9,7 @@ class OllamaProvider(LLMProvider):
 
     def chat(self, messages, tools=None) -> LLMResponse:
         payload = {"model": self.model, "messages": messages,
-                   "stream": False, "think": False}
+            "stream": False, "think": False, "keep_alive": "30m"}
         if tools:
             payload["tools"] = tools
         t0 = time.perf_counter()

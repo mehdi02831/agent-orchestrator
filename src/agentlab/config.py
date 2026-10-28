@@ -12,3 +12,5 @@ RAG_API_URL = os.getenv("RAG_API_URL", "http://127.0.0.1:8000")
 WORKSPACE = ROOT / "workspace"
 REFUSAL_TEXT = "I don't know based on the documentation."
 RAG_API_KEY = os.getenv("RAG_API_KEY", "")
+FETCH_ALLOWED_HOSTS = {h.strip() for h in os.getenv("FETCH_ALLOWED_HOSTS", "docs.djangoproject.com").split(",") if h.strip()}
+MAX_TOOL_OUTPUT_CHARS = 4000
