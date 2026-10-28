@@ -33,7 +33,7 @@ ap.add_argument("--split", choices=["dev", "test", "all"], default="dev")
 ap.add_argument("--ids", nargs="+")
 ap.add_argument("--agent", choices=["single", "supervisor"], default="single")
 ap.add_argument("--prompt", choices=sorted(PROMPTS), default="v1")
-ap.add_argument("--guards", nargs="*", choices=["gate", "relay", "failures"], default=[])
+ap.add_argument("--guards", nargs="*", choices=["gate", "relay", "failures", "provenance"], default=[])
 ap.add_argument("--final", action="store_true", help="required to touch the frozen test split")
 args = ap.parse_args()
 
@@ -53,7 +53,7 @@ provider = get_provider()
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 out_path = ROOT / "eval" / "results" / f"{args.agent}_{args.split}_{ts}.jsonl"
 meta = {"meta": {"agent": args.agent, "model": config.OLLAMA_MODEL, "git": git_rev(),
-                 "split": args.split, "prompt": args.prompt if args.agent == "single" else "supervisor-v1", "guards": sorted(args.guards), "time": ts, "n_tasks": len(tasks)}}
+                 "split": args.split, "prompt": args.prompt if args.agent == "single" else "supervisor-v2", "guards": sorted(args.guards), "time": ts, "n_tasks": len(tasks)}}
 rows, consecutive_errors = [], 0
 with out_path.open("w", encoding="utf-8") as f:
     f.write(json.dumps(meta) + "\n")
@@ -87,4 +87,4 @@ for row_ in rows:
     if g_:
         fired[g_] = fired.get(g_, 0) + 1
 print("Guards enabled:      ", sorted(args.guards) or "none", "| fired:", fired or "none")
-print("\nAgent:", args.agent, "| Prompt:", args.prompt if args.agent == "single" else "supervisor-v1", "| Traces:", out_path)
+print("\nAgent:", args.agent, "| Prompt:", args.prompt if args.agent == "single" else "supervisor-v2", "| Traces:", out_path)

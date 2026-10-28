@@ -34,3 +34,17 @@ def unrecovered_failure(tool_calls: list) -> bool:
         if c["name"] != "ask_human":
             last[c["name"]] = c["kind"]
     return any(kind == "tool_error" for kind in last.values())
+
+
+def unsupported_refusal(final_text: str, tool_calls: list) -> bool:
+    """True if the final text is the refusal sentence but no successful rag_ask call returned it."""
+    if final_text.strip() != config.REFUSAL_TEXT:
+        return False
+    for c in tool_calls:
+        if c["name"] == "rag_ask" and c["kind"] == "ok":
+            try:
+                if json.loads(c["content"]).get("answer", "").strip() == config.REFUSAL_TEXT:
+                    return False
+            except (ValueError, AttributeError):
+                continue
+    return True

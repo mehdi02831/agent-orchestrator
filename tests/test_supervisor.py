@@ -163,3 +163,23 @@ def test_config_error_aborts_the_run(monkeypatch):
     llm = FakeLLM(sup=[J(action="delegate", agent="rag", task="x")], spec=[call("rag_ask", question="q")])
     with pytest.raises(ToolConfigError):
         run_supervisor(llm, "x")
+
+
+def _fallback_llm():
+    return FakeLLM(sup=[J(action="delegate", agent="web", task="fetch x"), J(action="finish", answer=config.REFUSAL_TEXT)],
+                   spec=[LLMResponse("Connection refused")])
+
+
+def test_provenance_guard_catches_fallback_sentence():
+    off = run_supervisor(_fallback_llm(), "x")
+    on = run_supervisor(_fallback_llm(), "x", guards=frozenset({"provenance"}))
+    assert off.outcome == "answer" and off.guard_fired == ""
+    assert on.outcome == "escalate" and on.guard_fired == "provenance" and on.reason_type == "low_confidence"
+
+
+def test_provenance_guard_keeps_real_refusal(monkeypatch):
+    fake_rag(monkeypatch, config.REFUSAL_TEXT)
+    llm = FakeLLM(sup=[J(action="delegate", agent="rag", task="q"), J(action="finish", answer=config.REFUSAL_TEXT)],
+                  spec=[call("rag_ask", question="q"), LLMResponse(config.REFUSAL_TEXT)])
+    r = run_supervisor(llm, "q", guards=frozenset({"provenance"}))
+    assert r.outcome == "answer" and r.guard_fired == ""

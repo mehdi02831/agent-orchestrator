@@ -140,3 +140,17 @@ def test_failures_guard_turns_giving_up_into_escalation():
     on = run_single(script(), "x", guards=frozenset({"failures"}))
     assert off.outcome == "answer"
     assert on.outcome == "escalate" and on.guard_fired == "failures"
+
+
+def test_unsupported_refusal_without_rag():
+    from agentlab.agents.guardrails import unsupported_refusal
+    assert unsupported_refusal(config.REFUSAL_TEXT, [])
+    assert unsupported_refusal(config.REFUSAL_TEXT, [_c("web_fetch", "tool_error")])
+
+
+def test_supported_refusal_and_other_answers():
+    from agentlab.agents.guardrails import unsupported_refusal
+    assert not unsupported_refusal(config.REFUSAL_TEXT, [_c("rag_ask", "ok", REFUSAL_JSON)])
+    assert not unsupported_refusal("Canberra", [])
+    real = json.dumps({"answer": "startapp", "sources": ["x"]})
+    assert unsupported_refusal(config.REFUSAL_TEXT, [_c("rag_ask", "ok", real)])

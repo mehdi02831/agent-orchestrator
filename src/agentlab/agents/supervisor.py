@@ -8,7 +8,7 @@ from langgraph.graph import END, START, StateGraph
 
 from .. import config
 from ..llm.base import LLMProvider
-from .guardrails import is_risky, refusal_relay, unrecovered_failure
+from .guardrails import is_risky, refusal_relay, unrecovered_failure, unsupported_refusal
 from .single import RunResult
 from .specialist import run_specialist
 
@@ -41,10 +41,11 @@ Actions:
 {"action": "escalate", "reason_type": "risky_action|tool_failure|low_confidence", "reason": "<why a human is needed>"}
 Rules:
 1. Any general-knowledge or Django question MUST be delegated to rag first. Never answer such a question from memory.
-2. If rag returned "__REFUSAL__", finish with exactly that sentence. Add nothing: no apology, no other source, no guess.
+2. If rag returned "__REFUSAL__", finish with exactly that sentence. Add nothing: no apology, no other source, no guess. Use that sentence ONLY when rag returned it; never as a general way to say you cannot help.
 3. Arithmetic and file reading go to data. Split multi-part requests: one delegation per part, then finish with a combined answer.
 4. Escalate instead of finishing, with the matching reason_type: risky_action when the request is to delete, overwrite, move or write a file (no specialist can); low_confidence when the request is too vague to act on; tool_failure when a specialist reported a tool error twice.
-5. Delegated tasks must be self-contained: include file paths and numbers."""
+5. Delegated tasks must be self-contained: include file paths and numbers.
+6. When finishing, copy numbers from the specialist results exactly. Never add, subtract or recompute them yourself; if a result already covers every step of the request, finish with it."""
 SUPERVISOR_PROMPT = SUPERVISOR_PROMPT.replace("__REFUSAL__", config.REFUSAL_TEXT)
 
 
@@ -182,6 +183,9 @@ def build_graph(provider: LLMProvider, guards=frozenset()):
             if ("relay" in guards and refusal_relay(state["tool_calls"])
                     and state["final_text"].strip() != config.REFUSAL_TEXT):
                 return {"final_text": config.REFUSAL_TEXT, "guard_fired": "relay"}
+            if "provenance" in guards and unsupported_refusal(state["final_text"], state["tool_calls"]):
+                return {"outcome": "escalate", "reason": "guard: refusal sentence without a rag_ask source",
+                        "reason_type": "low_confidence", "guard_fired": "provenance"}
             if "failures" in guards and unrecovered_failure(state["tool_calls"]):
                 return {"outcome": "escalate", "reason": "guard: tool failure not recovered",
                         "reason_type": "tool_failure", "guard_fired": "failures"}
