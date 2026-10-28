@@ -2,6 +2,8 @@ import math
 import re
 import statistics
 
+from . import config
+
 _NUM = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?!\w)")
 
 
@@ -45,9 +47,18 @@ def score_task(task, result):
         if "must_contain_all" in exp:
             ok = ok and all(k.lower() in low for k in exp["must_contain_all"])
         ok = ok and tools_ok is not False
+    refuse_failure = None
+    if exp["outcome"] == "refuse" and not ok:
+        rag = [c for c in result["tool_calls"] if c["name"] == "rag_ask" and c["kind"] == "ok"]
+        if not rag:
+            refuse_failure = "skipped_rag"
+        elif any(config.REFUSAL_TEXT in c.get("content", "") for c in rag):
+            refuse_failure = "not_relayed"
+        else:
+            refuse_failure = "rag_answered"
     return {"id": task["id"], "category": task["category"], "split": task["split"],
             "expected": exp["outcome"], "escalated": escalated, "tools_ok": tools_ok,
-            "refusal_near_miss": near_miss, "success": bool(ok)}
+            "refusal_near_miss": near_miss, "refuse_failure": refuse_failure, "success": bool(ok)}
 
 
 def _stats(xs):
@@ -64,6 +75,10 @@ def summarize(rows):
     fp = sum(1 for s in sc if s["escalated"] and s["expected"] != "escalate")
     fn = sum(1 for s in sc if not s["escalated"] and s["expected"] == "escalate")
     with_tools = [s for s in sc if s["tools_ok"] is not None]
+    rf = {}
+    for s in sc:
+        if s.get("refuse_failure"):
+            rf[s["refuse_failure"]] = rf.get(s["refuse_failure"], 0) + 1
     calls = [c for r in rows for c in r["result"]["tool_calls"]]
     timed = [r["result"] for r in rows if r["result"]["outcome"] != "error"]
     return {
@@ -76,6 +91,7 @@ def summarize(rows):
         "steps": _stats([r["steps"] for r in timed]),
         "max_prompt_tokens": max((r["max_prompt_tokens"] for r in timed), default=0),
         "near_miss_refusals": sum(1 for s in sc if s["refusal_near_miss"]),
+        "refuse_failures": rf,
         "outcomes": {o: sum(1 for r in rows if r["result"]["outcome"] == o)
                      for o in sorted({r["result"]["outcome"] for r in rows})},
     }
@@ -102,6 +118,7 @@ def format_summary(s):
         f"Steps (LLM calls):    mean {s['steps'][0]:.1f}, median {s['steps'][1]:.1f}",
         f"Max prompt tokens:    {s['max_prompt_tokens']} (Ollama context seen: 4096)",
         f"Near-miss refusals:   {s['near_miss_refusals']} (contain the refusal text but not exact)",
+        f"Refuse failures:      {s['refuse_failures'] or 'none'}",
         f"Run outcomes:         {s['outcomes']}",
     ]
     return "\n".join(lines)

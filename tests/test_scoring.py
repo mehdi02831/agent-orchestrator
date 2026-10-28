@@ -56,3 +56,16 @@ def test_escalation_scoring_and_precision_recall():
     assert tp["score"]["success"] and not fn["score"]["success"] and not fp["score"]["success"]
     e = summarize([tp, fn, fp])["esc"]
     assert (e["tp"], e["fp"], e["fn"]) == (1, 1, 1)
+
+
+def test_refuse_failure_causes():
+    assert score_task(REF, _res(text="Canberra"))["refuse_failure"] == "skipped_rag"
+    relayed_wrong = _res(text="I have no info.")
+    relayed_wrong["tool_calls"] = [{"name": "rag_ask", "kind": "ok",
+                                    "content": '{"answer": "' + config.REFUSAL_TEXT + '", "sources": []}'}]
+    assert score_task(REF, relayed_wrong)["refuse_failure"] == "not_relayed"
+    answered = _res(text="startapp")
+    answered["tool_calls"] = [{"name": "rag_ask", "kind": "ok",
+                               "content": '{"answer": "startapp", "sources": ["x"]}'}]
+    assert score_task(REF, answered)["refuse_failure"] == "rag_answered"
+    assert score_task(REF, _res(text=config.REFUSAL_TEXT))["refuse_failure"] is None

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from agentlab import config
-from agentlab.agents.single import RunResult, run_single
+from agentlab.agents.single import PROMPTS, RunResult, run_single
 from agentlab.llm.factory import get_provider
 from agentlab.scoring import format_summary, score_task, summarize
 from agentlab.tools.base import ToolConfigError
@@ -30,6 +30,7 @@ def ascii_safe(s):
 ap = argparse.ArgumentParser()
 ap.add_argument("--split", choices=["dev", "test", "all"], default="dev")
 ap.add_argument("--ids", nargs="+")
+ap.add_argument("--prompt", choices=sorted(PROMPTS), default="v1")
 ap.add_argument("--final", action="store_true", help="required to touch the frozen test split")
 args = ap.parse_args()
 
@@ -49,13 +50,13 @@ provider = get_provider()
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 out_path = ROOT / "eval" / "results" / f"single_{args.split}_{ts}.jsonl"
 meta = {"meta": {"agent": "single", "model": config.OLLAMA_MODEL, "git": git_rev(),
-                 "split": args.split, "time": ts, "n_tasks": len(tasks)}}
+                 "split": args.split, "prompt": args.prompt, "time": ts, "n_tasks": len(tasks)}}
 rows, consecutive_errors = [], 0
 with out_path.open("w", encoding="utf-8") as f:
     f.write(json.dumps(meta) + "\n")
     for t in tasks:
         try:
-            res = run_single(provider, t["prompt"])
+            res = run_single(provider, t["prompt"], prompt_version=args.prompt)
             consecutive_errors = 0
         except ToolConfigError as e:
             sys.exit(f"CONFIG ERROR, aborting the run: {e}")
@@ -76,4 +77,4 @@ with out_path.open("w", encoding="utf-8") as f:
             sys.exit("3 consecutive errors (is Ollama running?). Partial results saved: " + str(out_path))
 
 print("\n" + format_summary(summarize(rows)))
-print("\nTraces:", out_path)
+print("\nPrompt:", args.prompt, "| Traces:", out_path)

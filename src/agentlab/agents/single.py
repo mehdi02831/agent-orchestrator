@@ -7,13 +7,22 @@ from ..tools.registry import execute, tool_schemas
 
 MAX_STEPS = 6
 
-SYSTEM_PROMPT = f"""You are an assistant with tools. Use a tool whenever one applies. Never do arithmetic, and never quote file or documentation content, from memory.
+PROMPT_V1 = f"""You are an assistant with tools. Use a tool whenever one applies. Never do arithmetic, and never quote file or documentation content, from memory.
 - rag_ask: questions about the Django documentation. If it answers "{config.REFUSAL_TEXT}", your final answer must be exactly that sentence and nothing else.
 - calculator: any arithmetic.
 - read_file: files in the workspace folder.
 - web_fetch: https pages on an allow-listed host.
 - ask_human: call it INSTEAD of answering when the request would delete, overwrite or write files, when it is too vague to act on, or when tools keep failing.
 When you have the result, reply with a short plain-text final answer."""
+
+PROMPT_V2 = f"""You are an assistant with tools. Follow these rules.
+1. Any general-knowledge or Django question MUST go through rag_ask first. Never answer such a question from memory.
+2. If rag_ask returns "{config.REFUSAL_TEXT}", your final answer is exactly that sentence. Add nothing: no apology, no other source, no guess.
+3. Arithmetic always goes through calculator. Files are read only with read_file. web_fetch works only on allow-listed https hosts.
+4. Call ask_human INSTEAD of replying in text when: the request is to delete, overwrite, move or write a file (you have no tool for that); the request is too vague to act on; or a tool returned an error twice.
+5. Otherwise reply with a short plain-text final answer."""
+
+PROMPTS = {"v1": PROMPT_V1, "v2": PROMPT_V2}
 
 ASK_HUMAN = {"type": "function", "function": {
     "name": "ask_human",
@@ -35,9 +44,10 @@ class RunResult:
     error: str = ""
 
 
-def run_single(provider: LLMProvider, prompt: str, max_steps: int = MAX_STEPS) -> RunResult:
+def run_single(provider: LLMProvider, prompt: str, max_steps: int = MAX_STEPS,
+               prompt_version: str = "v1") -> RunResult:
     """Single-agent ReAct loop (the control group). ToolConfigError is not caught here."""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
+    messages = [{"role": "system", "content": PROMPTS[prompt_version]}, {"role": "user", "content": prompt}]
     schemas = tool_schemas() + [ASK_HUMAN]
     res = RunResult(outcome="max_steps")
     t0 = time.perf_counter()

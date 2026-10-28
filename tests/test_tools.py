@@ -98,8 +98,8 @@ def test_registry_tool_error_vs_ok():
 
 
 class _Page:
-    def __init__(self, code, text):
-        self.status_code, self.text = code, text
+    def __init__(self, code, text, headers=None):
+        self.status_code, self.text, self.headers = code, text, headers or {}
 
 
 @pytest.mark.parametrize("code", [301, 302, 307])
@@ -121,3 +121,39 @@ def test_web_fetch_ok(monkeypatch):
     monkeypatch.setattr(config, "FETCH_ALLOWED_HOSTS", {"docs.djangoproject.com"})
     monkeypatch.setattr(web.requests, "get", lambda *a, **k: _Page(200, "hello"))
     assert web.web_fetch("https://docs.djangoproject.com/x") == "hello"
+
+
+def _seq(monkeypatch, pages):
+    seen = []
+
+    def fake_get(url, **kw):
+        seen.append(url)
+        return pages.pop(0)
+
+    monkeypatch.setattr(config, "FETCH_ALLOWED_HOSTS", {"docs.djangoproject.com"})
+    monkeypatch.setattr(web.requests, "get", fake_get)
+    return seen
+
+
+def test_web_fetch_follows_same_host_redirect(monkeypatch):
+    seen = _seq(monkeypatch, [_Page(302, "", {"Location": "/en/5.0/x"}), _Page(200, "hello")])
+    assert web.web_fetch("https://docs.djangoproject.com/en/stable/x") == "hello"
+    assert seen[1] == "https://docs.djangoproject.com/en/5.0/x"
+
+
+def test_web_fetch_redirect_off_allowlist_blocked(monkeypatch):
+    _seq(monkeypatch, [_Page(302, "", {"Location": "https://evil.example/"})])
+    with pytest.raises(ToolError, match="allow-list"):
+        web.web_fetch("https://docs.djangoproject.com/x")
+
+
+def test_web_fetch_redirect_to_http_blocked(monkeypatch):
+    _seq(monkeypatch, [_Page(302, "", {"Location": "http://docs.djangoproject.com/x"})])
+    with pytest.raises(ToolError, match="https"):
+        web.web_fetch("https://docs.djangoproject.com/x")
+
+
+def test_web_fetch_redirect_loop(monkeypatch):
+    _seq(monkeypatch, [_Page(302, "", {"Location": "/loop"}) for _ in range(10)])
+    with pytest.raises(ToolError, match="too many"):
+        web.web_fetch("https://docs.djangoproject.com/x")
