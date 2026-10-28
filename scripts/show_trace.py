@@ -24,6 +24,10 @@ for line in path.read_text(encoding="utf-8").splitlines():
     print("=" * 70)
     print(t["id"], "| expected:", t["expect"]["outcome"], "| success:", s["success"], "| outcome:", r["outcome"])
     print("PROMPT:", safe(t["prompt"]))
+    for d in r.get("delegations", []):
+        print(f"  DELEGATE {d['agent']}: {safe(d['task'])}")
+        if d.get("result"):
+            print(f"     RESULT: {safe(d['result'])}")
     for c in r["tool_calls"]:
         print(f"  CALL {c['name']} {safe(json.dumps(c['arguments']))} -> [{c['kind']}] {safe(c['content'])}")
     print("FINAL:", safe(r["final_text"] or r["escalation_reason"] or r["error"]))

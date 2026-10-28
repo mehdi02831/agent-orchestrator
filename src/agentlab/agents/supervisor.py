@@ -224,4 +224,5 @@ def run_supervisor(provider: LLMProvider, prompt: str, guards=frozenset()) -> Su
         tool_calls=calls, steps=st["steps"], latency_s=time.perf_counter() - t0,
         max_prompt_tokens=st["max_prompt_tokens"], error=st["error"], guard_fired=st["guard_fired"],
         invalid_plans=st["invalid_plans"], reason_type=st["reason_type"],
-        delegations=[{"agent": h["agent"], "task": h["task"]} for h in st["history"]])
+        delegations=[{"agent": h["agent"], "task": h["task"], "result": h["result"][:300]}
+                     for h in st["history"]])
