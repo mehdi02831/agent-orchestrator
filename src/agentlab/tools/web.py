@@ -14,6 +14,10 @@ def web_fetch(url: str) -> str:
         r = requests.get(url, timeout=10, allow_redirects=False)
     except requests.RequestException as e:
         raise ToolError(f"fetch failed: {type(e).__name__}")
+    if 300 <= r.status_code < 400:
+        raise ToolError(f"redirect not followed (HTTP {r.status_code})")
     if r.status_code >= 400:
         raise ToolError(f"HTTP {r.status_code}")
+    if not r.text.strip():
+        raise ToolError("empty response")
     return r.text[:20000]

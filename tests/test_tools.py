@@ -95,3 +95,29 @@ def test_registry_tool_error_vs_ok():
     assert execute("read_file", {"path": "fixtures/missing.csv"}).kind == "tool_error"
     r = execute("calculator", {"expression": "6 * 7"})
     assert r.ok and r.content == "42"
+
+
+class _Page:
+    def __init__(self, code, text):
+        self.status_code, self.text = code, text
+
+
+@pytest.mark.parametrize("code", [301, 302, 307])
+def test_web_fetch_redirect_is_error(monkeypatch, code):
+    monkeypatch.setattr(config, "FETCH_ALLOWED_HOSTS", {"docs.djangoproject.com"})
+    monkeypatch.setattr(web.requests, "get", lambda *a, **k: _Page(code, ""))
+    with pytest.raises(ToolError, match="redirect"):
+        web.web_fetch("https://docs.djangoproject.com/x")
+
+
+def test_web_fetch_empty_is_error(monkeypatch):
+    monkeypatch.setattr(config, "FETCH_ALLOWED_HOSTS", {"docs.djangoproject.com"})
+    monkeypatch.setattr(web.requests, "get", lambda *a, **k: _Page(200, "   "))
+    with pytest.raises(ToolError, match="empty"):
+        web.web_fetch("https://docs.djangoproject.com/x")
+
+
+def test_web_fetch_ok(monkeypatch):
+    monkeypatch.setattr(config, "FETCH_ALLOWED_HOSTS", {"docs.djangoproject.com"})
+    monkeypatch.setattr(web.requests, "get", lambda *a, **k: _Page(200, "hello"))
+    assert web.web_fetch("https://docs.djangoproject.com/x") == "hello"
