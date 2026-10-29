@@ -28,3 +28,7 @@ def postgres_conn(dbname=None):
 
 CHROMA_HOST = os.getenv("CHROMA_HOST", "127.0.0.1")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8001"))
+
+WRITE_DIR = WORKSPACE / "out"
+MAX_WRITE_CHARS = 20000
+WRITE_SUFFIXES = {".md", ".txt", ".csv", ".json"}
