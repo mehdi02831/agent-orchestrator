@@ -127,8 +127,9 @@ class State(TypedDict):
     guard_fired: str
 
 
-def _messages(prompt, history, feedback):
-    msgs = [{"role": "system", "content": SUPERVISOR_PROMPT}, {"role": "user", "content": prompt}]
+def _messages(prompt, history, feedback, note=""):
+    user = prompt + ("\n\n" + note if note else "")
+    msgs = [{"role": "system", "content": SUPERVISOR_PROMPT}, {"role": "user", "content": user}]
     for h in history:
         msgs.append({"role": "assistant",
                      "content": json.dumps({"action": "delegate", "agent": h["agent"], "task": h["task"]})})
@@ -137,12 +138,12 @@ def _messages(prompt, history, feedback):
     return msgs
 
 
-def build_graph(provider: LLMProvider, guards=frozenset()):
+def build_graph(provider: LLMProvider, guards=frozenset(), note: str = ""):
     def supervisor(state: State) -> dict:
         feedback = []
         steps, invalid, mpt = state["steps"], state["invalid_plans"], state["max_prompt_tokens"]
         for _ in range(MAX_PLAN_ATTEMPTS):
-            resp = provider.chat(_messages(state["prompt"], state["history"], feedback), None,
+            resp = provider.chat(_messages(state["prompt"], state["history"], feedback, note), None,
                                  response_format=DECISION_SCHEMA)
             steps += 1
             mpt = max(mpt, resp.raw.get("prompt_eval_count", 0))
@@ -206,7 +207,7 @@ def build_graph(provider: LLMProvider, guards=frozenset()):
     return g.compile()
 
 
-def run_supervisor(provider: LLMProvider, prompt: str, guards=frozenset()) -> SupervisorResult:
+def run_supervisor(provider: LLMProvider, prompt: str, guards=frozenset(), note: str = "") -> SupervisorResult:
     """Supervisor + specialists. ToolConfigError and LLM/network errors propagate to the caller."""
     t0 = time.perf_counter()
     if "gate" in guards and is_risky(prompt):
@@ -215,7 +216,7 @@ def run_supervisor(provider: LLMProvider, prompt: str, guards=frozenset()) -> Su
             outcome="escalate", escalation_reason=reason, reason_type="risky_action", guard_fired="gate",
             tool_calls=[{"name": "ask_human", "arguments": {"reason": reason}, "kind": "ok", "content": ""}],
             latency_s=time.perf_counter() - t0)
-    graph = build_graph(provider, guards)
+    graph = build_graph(provider, guards, note)
     st = graph.invoke({"prompt": prompt, "history": [], "tool_calls": [], "steps": 0, "turns": 0,
                        "invalid_plans": 0, "max_prompt_tokens": 0, "next_agent": "", "next_task": "",
                        "outcome": "", "final_text": "", "reason": "", "reason_type": "", "error": "",
