@@ -3,7 +3,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from agentlab.agents.supervisor import run_supervisor
+from agentlab.agents.hitl_run import run_with_review
+from agentlab.memory.pending import PostgresPendingStore
 from agentlab.llm.factory import get_provider
 from agentlab.memory.records import run_record
 from agentlab.memory.semantic import ChromaMemory, should_remember
@@ -57,10 +58,13 @@ elif args.forget:
     except Exception as e:
         print("chroma: WARNING", type(e).__name__, "(entry may remain)")
 elif args.prompt:
-    res = run_supervisor(get_provider(), args.prompt, guards=frozenset(GUARDS))
-    rid = store.save_run(run_record("supervisor", args.prompt, res, {"guards": GUARDS}))
+    pending = PostgresPendingStore.from_config()
+    pending.init_schema()
+    out = run_with_review(get_provider(), args.prompt, store, pending, guards=frozenset(GUARDS))
+    res, rid = out.result, out.run_id
     print("saved as run", rid, "|", res.outcome, "|", f"{res.latency_s:.1f}s")
     print("final:", safe(res.final_text or res.escalation_reason))
+    print("review:", out.proposal, "| pending action", out.pending_id or "-")
     if should_remember(res.outcome, res.final_text):
         try:
             ChromaMemory.from_config().remember(rid, args.prompt, res.final_text)

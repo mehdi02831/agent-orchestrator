@@ -3,7 +3,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from agentlab.hitl import HitlError, decide, propose
+from agentlab.agents.hitl_run import resolve
+from agentlab.hitl import HitlError, propose
+from agentlab.memory.store import PostgresRunStore
 from agentlab.memory.pending import PostgresPendingStore
 from agentlab.tools.base import ToolError
 
@@ -57,7 +59,7 @@ try:
             edits = {k: v for k, v in (("content", args.content), ("path", args.path)) if v is not None}
             if args.overwrite:
                 edits["overwrite"] = True
-        status, msg = decide(store, args.id, args.cmd, edits=edits, note=args.note)
+        status, msg = resolve(PostgresRunStore.from_config(), store, args.id, args.cmd, edits=edits, note=args.note)
         print(status, "|", safe(msg))
 except (HitlError, ToolError) as e:
     sys.exit(f"refused: {e}")

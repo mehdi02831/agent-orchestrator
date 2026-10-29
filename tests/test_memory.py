@@ -101,3 +101,10 @@ def test_delete_run_cascades(store):
     with psycopg.connect(**config.postgres_conn(TEST_DB)) as c:
         n = c.execute("SELECT count(*) FROM run_tool_calls WHERE run_id = %s", (rid,)).fetchone()[0]
     assert n == 0
+
+
+def test_set_status(store):
+    rid = store.save_run(run_record("supervisor", "q", _sup()))
+    assert store.set_status(rid, "approved") is True
+    assert store.get_run(rid)["status"] == "approved"
+    assert store.set_status(10**9, "x") is False

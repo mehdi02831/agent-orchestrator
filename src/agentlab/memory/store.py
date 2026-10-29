@@ -57,6 +57,9 @@ class RunStore(ABC):
     @abstractmethod
     def delete_run(self, run_id: int) -> bool: ...
 
+    @abstractmethod
+    def set_status(self, run_id: int, status: str) -> bool: ...
+
 
 class PostgresRunStore(RunStore):
     def __init__(self, **conn_kwargs):
@@ -119,4 +122,9 @@ class PostgresRunStore(RunStore):
     def delete_run(self, run_id):
         with self._connect() as c:
             cur = c.execute("DELETE FROM runs WHERE id = %s", (run_id,))
+            return cur.rowcount > 0
+
+    def set_status(self, run_id, status):
+        with self._connect() as c:
+            cur = c.execute("UPDATE runs SET status = %s WHERE id = %s", (status, run_id))
             return cur.rowcount > 0
