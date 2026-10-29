@@ -17,8 +17,8 @@ STATUS_FOR = {"approve": "approved", "edit": "edited", "reject": "rejected"}
 DRAFT_SCHEMA = {"type": "object", "properties": {"content": {"type": "string"}}, "required": ["content"]}
 DRAFT_SYSTEM = ('You write the content of a document. Reply with ONE JSON object: {"content": "<the full text>"}. '
                 "Use only the source material provided. Do not invent facts. Plain text or Markdown.")
-SOURCE_TASK = ("Find what the Django documentation says that is needed for this request. Use rag_ask. "
-               "Do not write any file. Request: {prompt}")
+SOURCE_TASK = ('Call rag_ask with exactly this question and nothing else: "{question}" '
+               "Do not write any file.")
 
 _TARGET = re.compile(r"""\b(?:to|into)\s+(?:the\s+)?(?:file\s+)?["']?([^\s"']+)""", re.I)
 _PATHLIKE = re.compile(r"[\\/]|\.\w+$")
@@ -29,6 +29,34 @@ def extract_target_path(prompt):
     cands = [c.rstrip(".,;:)!?") for c in _TARGET.findall(prompt)]
     cands = [c for c in cands if c and _PATHLIKE.search(c)]
     return cands[-1] if cands else None
+
+
+_VERB = re.compile(r"^\s*(?:please\s+)?(?:write|save|export|append|create|draft|produce)\s+", re.I)
+_ARTICLE = re.compile(r"^(?:an?|the)\s+", re.I)
+_ADJ = re.compile(r"^(?:short|brief|quick|detailed|full|complete|concise)\s+", re.I)
+_NOUN = re.compile(r"^(?:summary|explanation|overview|description|report|notes?|write-?up)\s+(?:of|about|on|for)\s+", re.I)
+_DOCWORD = re.compile(r"\b(?:docs?|documentation)\b", re.I)
+_TAIL_PREP = re.compile(r"\s*\b(?:to|into)\b(?:\s+the)?(?:\s+file)?\s*[\"']?$", re.I)
+
+
+def topic_from_prompt(prompt, path):
+    """Deterministic topic: the request minus verb, filler, doc words and the target path. '' if nothing is left."""
+    idx = prompt.rfind(path)
+    head = prompt[:idx] if idx >= 0 else prompt
+    head = _TAIL_PREP.sub("", head.strip())
+    head = _VERB.sub("", head)
+    head = _ARTICLE.sub("", head)
+    head = _ADJ.sub("", head)
+    head = _NOUN.sub("", head)
+    head = _ARTICLE.sub("", head)
+    head = _DOCWORD.sub("", head)
+    topic = re.sub(r"\s+", " ", head).strip(" .,;:!?")
+    return topic if len(topic) >= 3 else ""
+
+
+def source_question(topic):
+    t = topic.rstrip("?")
+    return f"Explain {t}." if "django" in t.lower() else f"Explain {t} in Django."
 
 
 @dataclass
@@ -65,7 +93,10 @@ def _maybe_propose(provider, prompt, res, run_id, pending_store):
         resolve_write_path(path)
     except ToolError:
         return "invalid_target", None
-    src = run_specialist(provider, "rag", SOURCE_TASK.format(prompt=prompt))  # ToolConfigError propagates
+    topic = topic_from_prompt(prompt, path)
+    if not topic:
+        return "no_topic", None
+    src = run_specialist(provider, "rag", SOURCE_TASK.format(question=source_question(topic)))  # ToolConfigError propagates
     if not any(c["name"] == "rag_ask" and c["kind"] == "ok" for c in src.tool_calls):
         return "no_source", None
     if refusal_relay(src.tool_calls):

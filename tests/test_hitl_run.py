@@ -209,3 +209,46 @@ def test_extract_target_path(prompt, expected):
 def test_frozen_runner_never_imports_review_code():
     src = (Path(__file__).resolve().parents[1] / "eval" / "run_eval.py").read_text(encoding="utf-8")
     assert "hitl_run" not in src
+
+
+from agentlab.agents.hitl_run import source_question, topic_from_prompt
+
+
+@pytest.mark.parametrize("prompt,path,topic", [
+    ("Write a summary of the Django ORM docs to workspace/out/summary.md.", "workspace/out/summary.md", "Django ORM"),
+    ("Save a short summary of Django migrations to workspace/out/migrations.md", "workspace/out/migrations.md",
+     "Django migrations"),
+    ("Write what the startapp command does into workspace/out/startapp.txt", "workspace/out/startapp.txt",
+     "what the startapp command does"),
+    ("Export an explanation of select_related to workspace/out/orm.md", "workspace/out/orm.md", "select_related"),
+])
+def test_topic_from_prompt(prompt, path, topic):
+    assert topic_from_prompt(prompt, path) == topic
+
+
+@pytest.mark.parametrize("topic,question", [
+    ("Django ORM", "Explain Django ORM."),
+    ("select_related", "Explain select_related in Django."),
+])
+def test_source_question(topic, question):
+    assert source_question(topic) == question
+
+
+def test_no_topic_makes_no_llm_call():
+    pend = MemStore()
+    out = run_with_review(Boom(), "Write it to workspace/out/a.md", MemRuns(), pend, guards=G)
+    assert out.proposal == "no_topic" and pend.rows == {}
+
+
+def test_specialist_receives_the_topic_question(monkeypatch):
+    fake_rag(monkeypatch, "The ORM maps models to tables.")
+    seen = []
+
+    class Rec(Seq):
+        def chat(self, messages, tools=None, response_format=None):
+            seen.append(messages)
+            return super().chat(messages, tools, response_format)
+
+    run_with_review(Rec(rag_call(), LLMResponse("text"), LLMResponse(json.dumps({"content": "x"}))),
+                    WRITE, MemRuns(), MemStore(), guards=G)
+    assert "Explain Django ORM." in seen[0][1]["content"] and "workspace" not in seen[0][1]["content"]
