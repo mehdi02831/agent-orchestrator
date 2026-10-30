@@ -7,3 +7,4 @@ langgraphsentence-transformers
 fastapi
 httpx
 celery[redis]
+streamlit
