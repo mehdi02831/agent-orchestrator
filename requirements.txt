@@ -4,3 +4,6 @@ pytest
 psycopg[binary]
 chromadb-client
 langgraphsentence-transformers
+fastapi
+httpx
+celery[redis]

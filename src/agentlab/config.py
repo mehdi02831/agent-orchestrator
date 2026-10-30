@@ -32,3 +32,6 @@ CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8001"))
 WRITE_DIR = WORKSPACE / "out"
 MAX_WRITE_CHARS = 20000
 WRITE_SUFFIXES = {".md", ".txt", ".csv", ".json"}
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+ORCH_API_KEY = os.getenv("ORCH_API_KEY", "")
