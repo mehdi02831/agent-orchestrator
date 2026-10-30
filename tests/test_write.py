@@ -65,3 +65,10 @@ def test_subfolder_created(out_dir):
 
 def test_not_an_agent_tool():
     assert "write_file" not in registry.TOOLS
+
+
+@pytest.mark.parametrize("p", ["workspace/restart.md", "workspace\\restart.md"])
+def test_workspace_path_outside_out_is_refused(out_dir, p):
+    with pytest.raises(ToolError, match="workspace/out"):
+        write_file(p, "x")
+    assert not list(out_dir.iterdir())

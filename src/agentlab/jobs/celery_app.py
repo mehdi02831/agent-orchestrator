@@ -6,7 +6,8 @@ from .. import config
 
 app = Celery("agentlab", broker=config.REDIS_URL, backend=config.REDIS_URL)
 app.conf.update(result_expires=3600, task_track_started=True, worker_prefetch_multiplier=1,
-                task_acks_late=True, task_reject_on_worker_lost=True)
+                task_acks_late=True, task_reject_on_worker_lost=True,
+                broker_transport_options={"visibility_timeout": 300})
 
 
 @app.task(name="agentlab.echo")

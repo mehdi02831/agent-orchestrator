@@ -7,6 +7,8 @@ def _normalize(path: str) -> str:
     for prefix in ("workspace/out/", "out/"):
         if p.startswith(prefix):
             return p[len(prefix):]
+    if p.startswith("workspace/"):
+        raise ToolError("path must be under workspace/out/")
     return p
 
 
